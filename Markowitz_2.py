@@ -70,6 +70,53 @@ class MyPortfolio:
         TODO: Complete Task 4 Below
         """
 
+        lookback = 30
+        shrink = 0.1
+        top_n = 5
+        vol1 = 0.009
+        vol2 = 0.015
+        ratio1 = 1.15
+        ratio2 = 1.05
+        ratio3 = 0.85
+
+        for i in range(lookback, len(self.price)):
+            date = self.price.index[i]
+            window_returns = self.returns.iloc[i - lookback:i]
+            asset_returns = window_returns[assets]
+
+            mu = asset_returns.mean()
+            sigma = asset_returns.std()
+            sharpe = mu / (sigma + 1e-8)
+            score = mu * sharpe / (1 + 3 * sigma)
+
+            top_assets = score.sort_values(ascending=False).head(top_n).index
+            Sigma = asset_returns[top_assets].cov()
+            Sigma_shrink = (1 - shrink) * Sigma + shrink * np.diag(np.diag(Sigma))
+            inv_Sigma = np.linalg.pinv(Sigma_shrink.values)
+
+            raw_weights = inv_Sigma @ mu[top_assets].values
+            weights = np.maximum(raw_weights, 0)
+            if weights.sum() > 0:
+                weights = weights / weights.sum()
+            else:
+                weights[:] = 0
+
+            avg_vol = sigma[top_assets].mean()
+            if avg_vol < vol1:
+                invest_ratio = ratio1
+            elif avg_vol < vol2:
+                invest_ratio = ratio2
+            else:
+                invest_ratio = ratio3
+            weights *= invest_ratio
+
+            if weights.sum() > 1.0:
+                weights /= weights.sum()
+
+            self.portfolio_weights.loc[date] = 0
+            self.portfolio_weights.loc[date, top_assets] = weights
+            self.portfolio_weights.loc[date, self.exclude] = 0
+
         """
         TODO: Complete Task 4 Above
         """
